@@ -33,16 +33,23 @@ jobs:
     container:
       image: ghcr.io/hasiniainahasina1-art/camoufox-system:latest
       options: --user camoxuser
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GH_TOKEN }}
 
     steps:
+      - name: Masquer tous les secrets
+        run: |
+          echo "::add-mask::${{ secrets.GH_TOKEN }}"
+          echo "::add-mask::${{ secrets.CRYPTO_SECRET }}"
+          echo "::add-mask::${{ secrets.CRON_SECRET }}"
+          echo "::add-mask::${{ secrets.APP_URL }}"
+          echo "::add-mask::hasiniainahasina1-art"
+          echo "::add-mask::pick-faucet"
+
       - name: Cloner le depot prive dans /app
         timeout-minutes: 2
         run: |
           set -e
           git clone \
+            --quiet \
             --depth=1 \
             --branch main \
             https://${{ secrets.GH_TOKEN }}@github.com/hasiniainahasina1-art/pick-faucet.git \
