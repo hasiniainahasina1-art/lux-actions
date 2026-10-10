@@ -1,0 +1,113 @@
+name: Dice Lux (Camoufox)
+
+on:
+  workflow_dispatch:
+    inputs:
+      accountFile:
+        description: "Fichier compte (ex: account_USERID_tronlux_email@gmail.com.json)"
+        required: true
+        type: string
+      baseBet:
+        description: "Mise initiale (0 = auto solde/2000)"
+        required: false
+        type: string
+        default: "0"
+
+jobs:
+  dice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: ghcr.io/hasiniainahasina1-art/camoufox-system:latest
+      options: --user camoxuser
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GH_TOKEN }}
+
+    steps:
+      - name: Masquer les données sensibles
+        run: |
+          echo "::add-mask::${{ github.event.inputs.accountFile }}"
+          echo "::add-mask::hasiniainahasina1-art"
+          echo "::add-mask::pick-faucet"
+
+      - name: Cloner le dépôt privé dans /app
+        timeout-minutes: 2
+        run: |
+          set -e
+          git clone \
+            --depth=1 \
+            --branch main \
+            https://${{ secrets.GH_TOKEN }}@github.com/hasiniainahasina1-art/pick-faucet.git \
+            /tmp/repo
+
+          cp -rn /tmp/repo/. /app/ || true
+          cp /tmp/repo/.env /app/.env 2>/dev/null || true
+          rm -rf /tmp/repo
+
+          mkdir -p /app/screenshots
+
+          echo "✅ Contenu /app :"
+          ls -la /app | head -40
+
+          if [ ! -f /app/lux_dice.py ]; then
+            echo "❌ lux_dice.py manquant dans pick-faucet"
+            exit 1
+          fi
+          echo "✅ lux_dice.py présent"
+
+      - name: Exécuter le bot dice
+        id: dice
+        timeout-minutes: 115
+        working-directory: /app
+        env:
+          PYTHONUNBUFFERED: "1"
+          HOME: /home/camoxuser
+          DISPLAY: ":99"
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_USERNAME: hasiniainahasina1-art
+          GH_REPO: pick-faucet
+          GH_BRANCH: main
+          CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}
+          ACCOUNT_FILE: ${{ github.event.inputs.accountFile }}
+          BASE_BET: ${{ github.event.inputs.baseBet }}
+        run: |
+          set +e
+          echo "::add-mask::${{ github.event.inputs.accountFile }}"
+
+          export PYTHONUNBUFFERED=1
+          timeout 7000 xvfb-run -s "-screen 0 1280x720x24" --auto-servernum \
+            python -u lux_dice.py
+          EXIT_CODE=$?
+
+          if [ "$EXIT_CODE" = "124" ]; then
+            echo "⏰ Timeout shell atteint (~2h)"
+            echo "exit_code=124" >> "$GITHUB_OUTPUT"
+            exit 124
+          fi
+
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          exit $EXIT_CODE
+
+      - name: Upload captures debug (si échec)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dice-lux-debug-${{ github.run_id }}
+          path: /app/screenshots/
+          retention-days: 3
+          if-no-files-found: ignore
+
+      - name: Résultat final
+        if: always()
+        run: |
+          CODE="${{ steps.dice.outputs.exit_code }}"
+          if [ "$CODE" = "0" ]; then
+            echo "✅ Dice Lux OK"
+          elif [ "$CODE" = "124" ]; then
+            echo "⏰ Timeout ~2h"
+            exit 1
+          else
+            echo "❌ Dice Lux échoué (code $CODE)"
+            exit 1
+          fi
