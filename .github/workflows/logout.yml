@@ -1,4 +1,4 @@
-name: Logout Lux (sans proxy)
+name: Logout Lux
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       platform:
-        description: "Plateforme lux (tronlux, usdlux, btclux, ethlux, bnblux, sollux, tonlux, dollux…)"
+        description: "Plateforme lux (tronlux, usdtlux, btclux, xrplux, pepelux, bnblux, shibalux...)"
         required: true
         type: string
       userId:
@@ -16,12 +16,12 @@ on:
         required: true
         type: string
       password:
-        description: "Mot de passe (ignoré pour la déconnexion)"
+        description: "Mot de passe (ignore)"
         required: false
         type: string
         default: ""
       proxyIndex:
-        description: "Index du proxy (ignoré)"
+        description: "Index du proxy (ignore)"
         required: false
         type: string
         default: "0"
@@ -38,7 +38,7 @@ jobs:
         password: ${{ secrets.GH_TOKEN }}
 
     steps:
-      - name: Cloner le dépôt privé dans /app
+      - name: Cloner le depot prive dans /app
         timeout-minutes: 2
         run: |
           set -e
@@ -52,9 +52,9 @@ jobs:
           cp /tmp/repo/.env /app/.env 2>/dev/null || true
           rm -rf /tmp/repo
 
-          echo "✅ Dépôt privé copié dans /app"
+          echo "Depot prive copie dans /app"
 
-      - name: Exécuter le script de déconnexion
+      - name: Executer le script de deconnexion
         working-directory: /app
         env:
           HOME: /home/camoxuser
@@ -71,11 +71,11 @@ jobs:
           xvfb-run -s "-screen 0 1280x720x24" --auto-servernum \
             python lux_logout.py
 
-      - name: Upload des vidéos
+      - name: Upload video de session
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: video-logout-lux-${{ github.event.inputs.platform }}-${{ github.run_id }}
           path: /app/videos/
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: warn

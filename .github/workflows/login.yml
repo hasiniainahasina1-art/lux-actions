@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       email:
-        description: "Adresse email du compte"
+        description: "Email du compte"
         required: true
         type: string
       password:
@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       platform:
-        description: "Plateforme lux (tronlux, usdlux, btclux, ethlux, bnblux, sollux, tonlux, dollux…)"
+        description: "Plateforme lux (tronlux, usdtlux, btclux, xrplux, pepelux, bnblux, shibalux...)"
         required: true
         type: string
       initialTimer:
@@ -37,7 +37,7 @@ jobs:
         password: ${{ secrets.GH_TOKEN }}
 
     steps:
-      - name: Masquer les données sensibles
+      - name: Masquer les donnees sensibles
         run: |
           echo "::add-mask::${{ github.event.inputs.password }}"
           echo "::add-mask::${{ github.event.inputs.email }}"
@@ -45,7 +45,7 @@ jobs:
           echo "::add-mask::hasiniainahasina1-art"
           echo "::add-mask::pick-faucet"
 
-      - name: Cloner le dépôt privé dans /app
+      - name: Cloner le depot prive dans /app
         timeout-minutes: 2
         run: |
           set -e
@@ -61,22 +61,22 @@ jobs:
 
           mkdir -p /app/videos
 
-          echo "✅ Dépôt privé copié dans /app"
+          echo "Depot prive copie dans /app"
           ls -la /app | head -40
 
-      - name: Vérifier les fichiers requis
+      - name: Verifier les fichiers requis
         timeout-minutes: 1
         run: |
           for f in lux_login.py ananana.py; do
             if [ ! -f "/app/$f" ]; then
-              echo "❌ Fichier manquant : $f"
+              echo "Fichier manquant : $f"
               exit 1
             else
-              echo "✅ Présent : $f"
+              echo "Present : $f"
             fi
           done
 
-      - name: Exécuter le script de login
+      - name: Executer le script de login
         id: login
         timeout-minutes: 10
         working-directory: /app
@@ -107,7 +107,7 @@ jobs:
           EXIT_CODE=$?
 
           if [ "$EXIT_CODE" = "124" ]; then
-            echo "⏰ Timeout login (~9 min)"
+            echo "Timeout login (9 min)"
             echo "exit_code=124" >> "$GITHUB_OUTPUT"
             exit 124
           fi
@@ -115,27 +115,27 @@ jobs:
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           exit $EXIT_CODE
 
-      - name: Upload vidéo de session
+      - name: Upload video de session
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: video-login-lux-${{ github.event.inputs.platform }}-${{ github.run_id }}
           path: /app/videos/
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: warn
 
-      - name: Résultat final
+      - name: Resultat final
         if: always()
         run: |
           CODE="${{ steps.login.outputs.exit_code }}"
           PLATFORM="${{ github.event.inputs.platform }}"
 
           if [ "$CODE" = "0" ]; then
-            echo "✅ Login réussi — plateforme $PLATFORM"
+            echo "Login reussi - plateforme $PLATFORM"
           elif [ "$CODE" = "124" ]; then
-            echo "⏰ Timeout — plateforme $PLATFORM"
+            echo "Timeout - plateforme $PLATFORM"
             exit 1
           else
-            echo "❌ Login échoué (code $CODE) — plateforme $PLATFORM"
+            echo "Login echoue (code $CODE) - plateforme $PLATFORM"
             exit 1
           fi
