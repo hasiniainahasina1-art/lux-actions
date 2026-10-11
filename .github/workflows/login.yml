@@ -1,4 +1,4 @@
-name: Login Lux
+name: Test Account Login
 
 on:
   workflow_dispatch:
@@ -12,26 +12,39 @@ on:
         required: true
         type: string
       platform:
-        description: "Plateforme lux (tronlux, usdtlux, btclux, xrplux, pepelux, bnblux, shibalux...)"
+        description: "Plateforme (ex: tronpick, litepick)"
         required: true
         type: string
+      proxyIndex:
+        description: "Index du proxy (ignore)"
+        required: false
+        type: string
+        default: "0"
       initialTimer:
         description: "Timer initial (format mm:ss)"
         required: false
         type: string
         default: "60:00"
+      action:
+        description: "Action (ignore)"
+        required: false
+        type: string
+        default: "login"
       userId:
         description: "Identifiant utilisateur Supabase"
         required: false
         type: string
 
 jobs:
-  login:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     container:
       image: ghcr.io/hasiniainahasina1-art/camoufox-system:latest
       options: --user camoxuser
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GH_TOKEN }}
 
     steps:
       - name: Masquer tous les secrets
@@ -39,12 +52,6 @@ jobs:
           echo "::add-mask::${{ secrets.GH_TOKEN }}"
           echo "::add-mask::${{ secrets.CRYPTO_SECRET }}"
           echo "::add-mask::${{ secrets.CRON_SECRET }}"
-          echo "::add-mask::${{ secrets.APP_URL }}"
-          echo "::add-mask::hasiniainahasina1-art"
-          echo "::add-mask::pick-faucet"
-
-      - name: Masquer les donnees sensibles
-        run: |
           echo "::add-mask::${{ github.event.inputs.password }}"
           echo "::add-mask::${{ github.event.inputs.email }}"
           echo "::add-mask::${{ github.event.inputs.userId }}"
@@ -67,14 +74,13 @@ jobs:
           rm -rf /tmp/repo
 
           mkdir -p /app/videos
-
           echo "Depot prive copie dans /app"
           ls -la /app | head -40
 
       - name: Verifier les fichiers requis
         timeout-minutes: 1
         run: |
-          for f in lux_login.py ananana.py; do
+          for f in login.py ananana.py ravitoto.py; do
             if [ ! -f "/app/$f" ]; then
               echo "Fichier manquant : $f"
               exit 1
@@ -94,7 +100,7 @@ jobs:
           TEST_EMAIL: ${{ github.event.inputs.email }}
           TEST_PASSWORD: ${{ github.event.inputs.password }}
           TEST_PLATFORM: ${{ github.event.inputs.platform }}
-          TEST_PROXY_INDEX: "0"
+          TEST_PROXY_INDEX: ${{ github.event.inputs.proxyIndex }}
           TEST_INITIAL_TIMER: ${{ github.event.inputs.initialTimer }}
           USER_ID: ${{ github.event.inputs.userId }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -104,17 +110,13 @@ jobs:
           CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}
         run: |
           set +e
-          echo "::add-mask::${{ github.event.inputs.password }}"
-          echo "::add-mask::${{ github.event.inputs.email }}"
-          echo "::add-mask::${{ github.event.inputs.userId }}"
-
           export PYTHONUNBUFFERED=1
           timeout 540 xvfb-run -s "-screen 0 1280x720x24" --auto-servernum \
             python -u lux_login.py
           EXIT_CODE=$?
 
           if [ "$EXIT_CODE" = "124" ]; then
-            echo "Timeout login (9 min)"
+            echo "Timeout login (~9 min)"
             echo "exit_code=124" >> "$GITHUB_OUTPUT"
             exit 124
           fi
@@ -126,7 +128,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: video-login-lux-${{ github.event.inputs.platform }}-${{ github.run_id }}
+          name: video-login-${{ github.run_id }}
           path: /app/videos/
           retention-days: 1
           if-no-files-found: warn
@@ -136,7 +138,6 @@ jobs:
         run: |
           CODE="${{ steps.login.outputs.exit_code }}"
           PLATFORM="${{ github.event.inputs.platform }}"
-
           if [ "$CODE" = "0" ]; then
             echo "Login reussi - plateforme $PLATFORM"
           elif [ "$CODE" = "124" ]; then
