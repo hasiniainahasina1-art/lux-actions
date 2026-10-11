@@ -1,0 +1,104 @@
+name: Inspecter HTML Lux
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL a inspecter"
+        required: false
+        type: string
+        default: "https://tronlux.io/login.php"
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Installer dependances Python
+        run: pip install requests beautifulsoup4 lxml
+
+      - name: Recuperer et analyser le HTML
+        run: |
+          python3 << 'PYEOF'
+          import requests
+          from bs4 import BeautifulSoup
+
+          url = "${{ github.event.inputs.url }}"
+          print(f"Recuperation de {url}")
+
+          headers = {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/120.0.0.0 Safari/537.36"
+          }
+          resp = requests.get(url, headers=headers, timeout=20)
+          print(f"Status : {resp.status_code}")
+          print(f"Taille HTML : {len(resp.text)} caracteres")
+
+          soup = BeautifulSoup(resp.text, "lxml")
+
+          print("\n" + "="*70)
+          print("FORMULAIRE COMPLET")
+          print("="*70)
+          form = soup.find("form")
+          if form:
+              print(form.prettify()[:6000])
+          else:
+              print("AUCUN <form> TROUVE DANS LE HTML STATIQUE")
+
+          print("\n" + "="*70)
+          print("TOUS LES ELEMENTS CONTENANT 'LOGIN' (insensible casse)")
+          print("="*70)
+          import re
+          for tag in soup.find_all(["a", "button", "input", "div", "span"]):
+              text = tag.get_text(strip=True)
+              value = tag.get("value", "")
+              combined = (text or value or "")
+              if combined.upper() == "LOGIN" or "LOGIN" in combined.upper():
+                  print(f"\n--- {tag.name} ---")
+                  print(f"  id        : {tag.get('id')}")
+                  print(f"  class     : {tag.get('class')}")
+                  print(f"  text      : {combined[:60]}")
+                  print(f"  disabled  : {tag.has_attr('disabled')}")
+                  print(f"  onclick   : {tag.get('onclick')}")
+                  print(f"  type      : {tag.get('type')}")
+                  print(f"  href      : {tag.get('href')}")
+                  print(f"  outerHTML : {str(tag)[:400]}")
+
+          print("\n" + "="*70)
+          print("TOUS LES INPUTS")
+          print("="*70)
+          for inp in soup.find_all("input"):
+              print(f"  id={inp.get('id')} name={inp.get('name')} "
+                    f"type={inp.get('type')} disabled={inp.has_attr('disabled')}")
+
+          print("\n" + "="*70)
+          print("TOUS LES BUTTONS")
+          print("="*70)
+          for btn in soup.find_all("button"):
+              print(f"  id={btn.get('id')} class={btn.get('class')} "
+                    f"disabled={btn.has_attr('disabled')} text={btn.get_text(strip=True)[:50]}")
+
+          print("\n" + "="*70)
+          print("SCRIPTS INLINE CONTENANT 'login' OU 'process'")
+          print("="*70)
+          for script in soup.find_all("script"):
+              if script.string and ("login" in script.string.lower() or "process" in script.string.lower()):
+                  print(script.string[:2000])
+                  print("---")
+
+          # Sauvegarder le HTML complet dans un fichier pour artifact
+          with open("page_source.html", "w", encoding="utf-8") as f:
+              f.write(resp.text)
+          print(f"\nHTML complet sauvegarde : page_source.html ({len(resp.text)} car.)")
+          PYEOF
+
+      - name: Upload HTML source complet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-source-${{ github.run_id }}
+          path: page_source.html
+          retention-days: 1
+          if-no-files-found: warn
