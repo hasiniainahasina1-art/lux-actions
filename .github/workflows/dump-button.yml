@@ -1,0 +1,57 @@
+name: Dump Bouton Login Tronlux
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL de base"
+        required: false
+        type: string
+        default: "https://tronlux.io"
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: ghcr.io/hasiniainahasina1-art/camoufox-system:latest
+      options: --user camoxuser
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GH_TOKEN }}
+
+    steps:
+      - name: Masquer les secrets
+        run: |
+          echo "::add-mask::${{ secrets.GH_TOKEN }}"
+
+      - name: Cloner le depot prive dans /app
+        run: |
+          set -e
+          git clone --quiet --depth=1 --branch main \
+            https://${{ secrets.GH_TOKEN }}@github.com/hasiniainahasina1-art/pick-faucet.git \
+            /tmp/repo
+          cp -rn /tmp/repo/. /app/ || true
+          rm -rf /tmp/repo
+          mkdir -p /app/screenshots
+
+      - name: Executer dump_button.py
+        working-directory: /app
+        env:
+          HOME: /home/camoxuser
+          DISPLAY: ":99"
+          LUX_BASE_URL: ${{ github.event.inputs.base_url }}
+        run: |
+          timeout 300 xvfb-run -s "-screen 0 1280x720x24" --auto-servernum \
+            python -u dump_button.py
+
+      - name: Upload rapport complet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dump-button-report-${{ github.run_id }}
+          path: |
+            /app/dump_button_report.txt
+            /app/screenshots/dump_button_final.png
+          retention-days: 1
+          if-no-files-found: warn
